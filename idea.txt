@@ -1,0 +1,539 @@
+# Full Game Plan: Three-Level Shooting Challenge
+
+## 1. Game overview
+
+Create a mouse-controlled shooting game in **Python using Ursina**, with three increasingly difficult levels.
+
+Players aim at enemies, shoot with unlimited ammunition, and try to survive until every enemy and boss has been defeated.
+
+The game includes:
+- A choice between **one-player and two-player modes**.
+- Four enemy types.
+- Three levels with increasing enemy health and score rewards.
+- Player health, enemy attacks, and a scoring system.
+- Start, pause, game-over, and victory screens.
+
+**Scope for the first version:** A stationary shooting-gallery game. Players aim around the screen but do not move their characters.
+
+> **Planning assumptions:** Hard enemies award **40 points**, since their original points value was missing. Two-player mode uses **alternating complete runs**, so both players can use the same mouse. These choices can be changed later.
+
+---
+
+## 2. Main game rules
+
+1. Each player begins their run with **100 HP**.
+2. Each player has a gun with **unlimited ammunition**.
+3. Moving the mouse moves the aiming crosshair.
+4. Pressing or holding the left mouse button fires the gun.
+5. A shot damages an enemy only if the crosshair is over that enemy.
+6. Each successful shot deals **one point of enemy damage**.
+7. Enemies periodically attack the player.
+8. Defeating enemies awards points.
+9. Defeating every enemy in a level unlocks the next level.
+10. Reaching zero HP ends that player’s run.
+11. Clearing all three levels wins the game.
+
+---
+
+## 3. Player modes
+
+### One-player mode
+
+One player attempts all three levels.
+
+- Starting health: **100 HP**
+- Starting score: **0**
+- Objective: Finish all three levels with the highest score possible.
+- Losing condition: Health reaches zero.
+
+### Two-player mode: alternating runs
+
+Both players use the same mouse, taking turns.
+
+1. Player 1 plays until they win or lose.
+2. Their results are saved for the current match.
+3. A handover screen asks Player 2 to begin.
+4. Player 2 starts a fresh run with the same enemy difficulty and wave layouts.
+5. A comparison screen displays both results.
+
+Each player receives:
+- Their own 100 HP.
+- Their own score.
+- A complete attempt at all three levels.
+
+**Winner ranking:**
+1. A player who completes the game ranks above one who does not.
+2. Otherwise, the higher score wins.
+3. If scores match, the higher remaining health wins.
+4. If still tied, the shorter active play time wins.
+5. If all these values match, declare a draw.
+
+Pause time and handover time do not count toward active play time.
+
+**Future expansion:** Simultaneous cooperative play with separate aiming controls. This is outside the first version because two players cannot independently aim using a single shared mouse.
+
+---
+
+## 4. Controls
+
+| Input | Action |
+|---|---|
+| Move mouse | Move the crosshair |
+| Left mouse button | Fire one shot |
+| Hold left mouse button | Fire repeatedly |
+| Escape | Pause or resume |
+| Mouse click on menu buttons | Select an option |
+
+### Shooting behavior
+
+- Fire immediately when the mouse button is pressed.
+- While held, fire once every **0.15 seconds**.
+- Do not allow extra clicks to bypass the firing cooldown.
+- No ammunition counter or reload mechanic is needed.
+- Each shot can hit only **one enemy**.
+- If enemies overlap, hit the closest visible enemy under the crosshair.
+- Shots cannot pass through enemies.
+
+This keeps damage consistent across different clicking speeds.
+
+---
+
+## 5. Enemy statistics
+
+### Level 1
+
+| Enemy | Hits to defeat | Points per defeat | Damage per attack |
+|---|---:|---:|---:|
+| Easy | 1 | 10 | 10 HP |
+| Medium | 3 | 20 | 13 HP |
+| Hard | 5 | 40 | 17 HP |
+| Boss | 20 | 100 | 30 HP |
+
+### Level 2
+
+Multiply Level 1 enemy health and points by three.
+
+| Enemy | Hits to defeat | Points per defeat | Damage per attack |
+|---|---:|---:|---:|
+| Easy | 3 | 30 | 10 HP |
+| Medium | 9 | 60 | 13 HP |
+| Hard | 15 | 120 | 17 HP |
+| Boss | 60 | 300 | 30 HP |
+
+### Level 3
+
+Multiply Level 2 enemy health and points by three again.
+
+| Enemy | Hits to defeat | Points per defeat | Damage per attack |
+|---|---:|---:|---:|
+| Easy | 9 | 90 | 10 HP |
+| Medium | 27 | 180 | 13 HP |
+| Hard | 45 | 360 | 17 HP |
+| Boss | 180 | 900 | 30 HP |
+
+**Important:** Only enemy health and points scale by three. Attack damage stays unchanged.
+
+The general rules are:
+
+\[
+\text{Enemy health}=\text{Base health}\times 3^{(\text{Level}-1)}
+\]
+
+\[
+\text{Defeat points}=\text{Base points}\times 3^{(\text{Level}-1)}
+\]
+
+---
+
+## 6. Enemy appearance and behavior
+
+Enemies should differ by **shape, label, and color**, rather than color alone.
+
+| Enemy | Suggested appearance | Movement |
+|---|---|---|
+| Easy | Small green target labeled “E” | Mostly stationary |
+| Medium | Blue armored target labeled “M” | Slow horizontal movement |
+| Hard | Orange angular target labeled “H” | Faster side-to-side movement |
+| Boss | Large purple target labeled “BOSS” | Slow movement across a larger area |
+
+### Shared behavior rules
+
+- Enemies stay inside the playable area.
+- They cannot spawn behind interface elements.
+- They cannot attack during their entrance animation.
+- Defeated enemies stop moving and attacking immediately.
+- Their health bars appear above them.
+- Later waves introduce tougher enemies gradually.
+
+---
+
+## 7. Enemy attack system
+
+Because the player cannot move, attacks must have a mouse-based counter.
+
+### Attack sequence
+
+Each enemy follows this sequence:
+
+**Enter → Wait → Warn → Attack → Recover**
+
+During the warning stage:
+- The enemy flashes.
+- A visible countdown ring appears around it.
+- A sound signals the incoming attack.
+
+### Interrupting attacks
+
+**Shoot an enemy once during its warning to cancel that attack.**
+
+- The shot still deals normal damage.
+- The enemy enters recovery.
+- When recovery finishes, it can prepare another attack.
+- Shots outside the warning stage do not reset its attack timer.
+
+This gives the player two competing priorities:
+- Finish damaged enemies.
+- Interrupt enemies that are about to attack.
+
+### Starting timing values
+
+| Enemy | Wait before warning | Warning duration | Recovery after attack or interruption |
+|---|---:|---:|---:|
+| Easy | 4 seconds | 2 seconds | 3 seconds |
+| Medium | 3.5 seconds | 1.7 seconds | 2.5 seconds |
+| Hard | 3 seconds | 1.4 seconds | 2 seconds |
+| Boss | 3 seconds | 1.8 seconds | 2.5 seconds |
+
+Use these as initial tuning values, not final balance guarantees.
+
+### Fairness rules
+
+- Only one enemy may enter its warning stage at a time in the first version.
+- Wait at least **0.5 seconds** between one warning ending and another beginning.
+- An uninterrupted attack deals its damage once, not every frame.
+- Pausing freezes all attack timers.
+
+---
+
+## 8. Level and wave structure
+
+Each level contains four waves.
+
+| Wave | Enemies |
+|---|---|
+| 1 | 4 easy |
+| 2 | 3 easy and 2 medium |
+| 3 | 2 medium and 2 hard |
+| 4 | 1 boss |
+
+Each level therefore contains:
+- **7 easy enemies**
+- **4 medium enemies**
+- **2 hard enemies**
+- **1 boss**
+- **14 enemies total**
+
+The complete game contains **42 enemies**, including three bosses.
+
+### Spawning rules
+
+- Maximum of **three regular enemies visible at once**.
+- Spawn remaining enemies when a visible enemy is defeated.
+- Give newly spawned enemies a **one-second entrance period** before they can attack.
+- Run the boss wave alone.
+- Begin the next wave after all enemies from the current wave are defeated.
+- Display a two-second wave announcement between waves.
+
+### Difficulty progression
+
+- **Level 1:** Introduces aiming, shooting, and attack interruption.
+- **Level 2:** Uses the same structure with tougher enemies and moderately faster movement.
+- **Level 3:** Uses maximum enemy health and faster movement, while keeping attacks readable and interruptible.
+
+Do not add extra enemies or increase attack damage until the original version has been playtested.
+
+---
+
+## 9. Health and recovery
+
+- Start each run with **100 HP**.
+- Maximum health is **100 HP**.
+- Health persists between waves.
+- After completing Levels 1 and 2, restore health to **100 HP**.
+- There are no health pickups in the first version.
+- At zero HP, immediately stop gameplay and show the game-over screen.
+
+Restoring health between levels makes each level a separate survival challenge without requiring a flawless full-game run.
+
+---
+
+## 10. Boss encounters
+
+Every level ends with one boss.
+
+### Boss rules
+
+- Display a large boss health bar at the top of the screen.
+- Show both remaining and maximum health.
+- Use a larger model than regular enemies.
+- Give attacks distinctive warning effects.
+- Keep the boss vulnerable throughout the encounter.
+- Allow attack interruption using the same rule as regular enemies.
+
+### Boss progression
+
+- **Level 1 boss:** Mostly stationary.
+- **Level 2 boss:** Moves slowly from side to side.
+- **Level 3 boss:** Moves faster and changes direction more often.
+
+The final boss requires **180 hits**. At one shot every 0.15 seconds, that is approximately **27 seconds of continuous accurate shooting**, so playtesting should check whether the encounter remains engaging.
+
+---
+
+## 11. Scoring and statistics
+
+### Score rules
+
+- Award points only when an enemy is defeated.
+- Do not award points for individual hits.
+- Misses do not subtract points.
+- Do not add survival, speed, or accuracy bonuses in the first version.
+
+### Maximum scores
+
+Using the planned enemy counts:
+
+| Level | Available points |
+|---|---:|
+| 1 | 330 |
+| 2 | 990 |
+| 3 | 2,970 |
+| **Full game** | **4,290** |
+
+### Track these statistics
+
+- Total score
+- Current level and wave
+- Enemies defeated
+- Shots fired
+- Successful hits
+- Accuracy
+- Active play time
+- Remaining health
+- Whether the player completed the game
+
+\[
+\text{Accuracy}=\frac{\text{Successful hits}}{\text{Shots fired}}\times 100\%
+\]
+
+If no shots have been fired, display accuracy as **0%**.
+
+---
+
+## 12. Screens and interface
+
+### Main menu
+- Game title
+- One Player
+- Two Players
+- How to Play
+- Sound on/off
+- Quit
+
+### Gameplay screen
+- Player health bar and HP number
+- Score
+- Level and wave number
+- Current player label
+- Crosshair
+- Enemy health bars
+- Boss health bar when applicable
+- Brief damage and hit feedback
+
+### Pause menu
+- Resume
+- Restart run
+- Return to main menu
+
+Restarting or leaving a run should require an on-screen confirmation.
+
+### Level-complete screen
+- Level completed
+- Current score
+- Health restoration message
+- Continue button
+
+### Game-over screen
+- Final score
+- Level and wave reached
+- Enemies defeated
+- Accuracy
+- Active play time
+- Retry or continue to Player 2
+- Main menu
+
+### Victory screen
+- Completion message
+- Final statistics
+- Play again
+- Main menu
+
+### Two-player results screen
+- Side-by-side results
+- Winner or draw
+- Play another match
+- Main menu
+
+---
+
+## 13. Visual and audio style
+
+Use a simple, non-graphic arcade style.
+
+### Visual feedback
+- Brief muzzle flash when firing.
+- Enemy flash when hit.
+- Small hit marker at the crosshair.
+- Floating points when an enemy is defeated.
+- Brief screen-edge flash when the player takes damage.
+- Simple particle effect when an enemy disappears.
+
+### Audio
+- Gunshot
+- Successful hit
+- Enemy defeat
+- Attack warning
+- Player damage
+- Boss entrance
+- Level completion
+- Victory and defeat
+
+Sound must be optional. Warnings must remain understandable without audio.
+
+Avoid strong screen shake or rapid flashing by default.
+
+---
+
+## 14. Technical organization
+
+Use Ursina for the game, with the logic separated into small systems.
+
+| Component | Responsibility |
+|---|---|
+| Game controller | Game state, mode selection, run progression |
+| Player state | Health, score, statistics |
+| Weapon | Firing input, cooldown, hit detection |
+| Enemy | Health, movement, attack states, defeat |
+| Wave manager | Enemy spawning and wave completion |
+| Attack coordinator | Prevents overlapping attack warnings |
+| Interface manager | Menus, HUD, results |
+| Audio manager | Sound playback and mute setting |
+| Configuration | Enemy statistics, timing, wave definitions |
+
+### Main game states
+
+```text
+MAIN MENU
+    ↓
+MODE SELECTION
+    ↓
+PLAYER READY
+    ↓
+PLAYING ↔ PAUSED
+    ↓
+LEVEL COMPLETE → NEXT LEVEL
+    ↓
+GAME OVER or VICTORY
+    ↓
+PLAYER 2 READY, if required
+    ↓
+FINAL RESULTS
+```
+
+Store enemy values and wave definitions in configuration data rather than scattering them throughout the code.
+
+When restarting a run, clear all enemies, timers, effects, and previous statistics before creating the new run.
+
+---
+
+## 15. Development milestones
+
+### Milestone 1: Basic shooting
+- Open the game window.
+- Show a crosshair.
+- Create one stationary enemy.
+- Implement shooting, hit detection, and defeat.
+
+### Milestone 2: Combat
+- Add the four enemy types.
+- Add health bars and scoring.
+- Add player damage.
+- Implement warnings and attack interruption.
+
+### Milestone 3: Full progression
+- Add waves and spawning limits.
+- Add all three levels.
+- Apply health and point scaling.
+- Add health restoration and win/loss conditions.
+
+### Milestone 4: Menus and player modes
+- Add the main menu and pause menu.
+- Add alternating two-player runs.
+- Add results comparison and restart behavior.
+
+### Milestone 5: Polish and balance
+- Add effects and sound.
+- Improve interface readability.
+- Test movement and attack timing.
+- Adjust values only after testing the complete loop.
+
+---
+
+## 16. Testing checklist
+
+### Shooting
+- A miss causes no damage.
+- A valid hit removes exactly one enemy health point.
+- Holding fire respects the cooldown.
+- One shot cannot damage multiple enemies.
+- Defeated enemies cannot receive additional hits or award duplicate points.
+
+### Enemy attacks
+- Damage matches the enemy’s type.
+- Warning shots interrupt attacks.
+- Attacks cause damage only once.
+- Only one warning occurs at a time.
+- Enemies cannot attack after defeat.
+
+### Progression
+- Every wave spawns the correct enemies.
+- Levels advance only after all enemies are defeated.
+- Level 2 values are three times Level 1 values.
+- Level 3 values are nine times Level 1 values.
+- Health restores between levels.
+- Clearing Level 3 triggers victory.
+
+### Player modes and menus
+- Player 2 starts with fresh health and statistics.
+- Both players receive equivalent enemy layouts.
+- Pausing freezes gameplay and active play time.
+- Restarting leaves no enemies or timers from the previous run.
+- Returning to the menu stops the current game.
+
+---
+
+## 17. First-version boundaries
+
+**Include:** Three levels, four enemy types, unlimited shooting, interruptible attacks, health, scoring, menus, and alternating two-player mode.
+
+**Save for later:** Simultaneous co-op, online multiplayer, player movement, weapon upgrades, pickups, extra enemy types, and saved leaderboards.
+
+**Definition of done:** A player can launch the game, select a mode, complete or lose a full run, view correct results, and restart without errors.
+
+For two person playing, you can take a look at the existing networking code at p2p/ You could reuse this module or create your own.
+
+Use modern software architecture.
+
+Latest ursina API reference is at https://www.ursinaengine.org/api_reference_v8_2_0/index.html.
+
+Also create a README.md for the purpose of the game, the requirements of installation, and how to play in the end.
